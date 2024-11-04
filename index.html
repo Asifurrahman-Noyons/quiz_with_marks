@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none; }
+        .fade-in { opacity: 0; transition: opacity 0.5s ease-in; }
+        .fade-in.show { opacity: 1; }
+        .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; }
+        .content { margin-top: 4rem; }
+        .quiz-box { margin-bottom: 2rem; }
+        .option {
+            transition: background-color 0.3s ease;
+        }
+        .option:hover {
+            background-color: #E0E7FF;
+        }
+        .option.selected {
+            background-color: #5468FF;
+            color: white;
+        }
+        .bg-color {
+            background: #F3F5F9;
+        }
+        .progress {
+            width: 100%;
+            height: 10px;
+            background: #E0E0E0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-color text-gray-900">
+
+<div class="navbar bg-white p-4">
+    <div class="flex items-center justify-between">
+        <button id="backButton" class="text-indigo-600 hidden" aria-label="Go back">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </button>
+        <h1 id="navTitle" class="text-xl font-bold flex-grow text-center"></h1>
+        <div id="timer" class="bg-red-600 text-white px-4 py-1 rounded-lg hidden" aria-live="assertive">left</div>
+    </div>
+</div>
+
+<div class="content max-w-3xl mx-auto p-4">
+    <div id="contentDisplay" class="hidden space-y-4"></div>
+    <div id="itemList" class="space-y-4"></div>
+</div>
+
+<script>
+  (function() {
+    const backButton = document.getElementById("backButton");
+    const navTitle = document.getElementById("navTitle");
+    const itemList = document.getElementById("itemList");
+    const contentDisplay = document.getElementById("contentDisplay");
+    const timerDisplay = document.getElementById("timer");
+
+    let currentView = "items";
+    let selectedAnswers = []; // Array of objects to store answer and lock status
+    let timer;
+    let timeLeft = 0;
+    let startTime;
+
+    const items = [
+        {
+            "id": "1",
+            "title": "ভূমিকা ও কোষ প্রাচীর",
+            "quiz": [
+                {
+                    "question": "1.কে কোষ আবিষ্কার করেন?",
+                    "options": ["ক.রবার্ট হুক", "খ.রবার্ট ডারউইন", "গ.রবার্ট ব্রাউন", "ঘ.লিউয়েন হুক"],
+                    "correctAnswer": "ক.রবার্ট হুক"
+                },
+                {
+                    "question": "2.কে কোষ বিভাজন আবিষ্কার করেন?",
+                    "options": ["ক.ফ্লেমিং", "খ.বোভেরী", "গ.স্ট্রাসবার্জার", "ঘ.শ্লাইখার"],
+                    "correctAnswer": "ক.ফ্লেমিং"
+                },
+            ]
+        },
+        {
+            "id": "2",
+            "title": "কোষের শারীরিক গঠন",
+            "quiz": [
+                {
+                    "question": "1.অ্যামাইনের প্রধান কার্য কি?",
+                    "options": ["ক.পুষ্টি", "খ.স্রাব", "গ.প্রতিক্রিয়া", "ঘ.শ্বাস"],
+                    "correctAnswer": "ক.পুষ্টি"
+                },
+                {
+                    "question": "2.জীবিত কোষের গঠন কি?",
+                    "options": ["ক.এককোষী", "খ.মাল্টিসেলুলার", "গ.দ্বি-স্তরবিশিষ্ট", "ঘ.অ্যামিফিবিয়"],
+                    "correctAnswer": "খ.মাল্টিসেলুলার"
+                },
+            ]
+        },
+        // Add more items as needed
+    ];
+
+    renderItems(items);
+
+    function renderItems(items) {
+        itemList.innerHTML = "";
+        currentView = "items";
+        navTitle.textContent = "জীব বিজ্ঞান মডেল টেস্ট";
+        backButton.classList.add("hidden");
+        contentDisplay.classList.add("hidden");
+        timerDisplay.classList.add("hidden");
+
+        items.forEach(item => {
+            const itemDiv = document.createElement("div");
+            itemDiv.classList.add("flex", "items-center", "justify-between", "p-4", "rounded-lg", "bg-white", "hover:bg-indigo-100", "cursor-pointer", "fade-in");
+
+            // Create progress circle
+            const progressCircle = document.createElement("div");
+            progressCircle.classList.add("relative", "w-10", "h-10", "rounded-full", "border-4", "border-indigo-500", "flex", "items-center", "justify-center");
+            const score = localStorage.getItem(`score-${item.id}`) || 0; // Get score from localStorage
+            const percentage = (score / item.quiz.length) * 100; // Calculate percentage
+            progressCircle.innerHTML = `<div class="absolute text-center text-xs">${Math.round(percentage)}%</div>`;
+            
+            const title = document.createElement("div");
+            title.classList.add("flex-grow", "ml-4", "font-semibold", "text-lg", "text-gray-800");
+            title.textContent = item.title;
+
+            const arrow = document.createElement("div");
+            arrow.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7" />
+                </svg>
+            `;
+
+            itemDiv.appendChild(progressCircle);
+            itemDiv.appendChild(title);
+            itemDiv.appendChild(arrow);
+            itemList.appendChild(itemDiv);
+
+            itemDiv.addEventListener("click", () => {
+                showQuiz(item.quiz, item.id); // Pass the item ID to store score
+            });
+        });
+
+        setTimeout(() => {
+            itemList.querySelectorAll('.fade-in').forEach(el => el.classList.add('show'));
+        }, 10);
+    }
+
+    function showQuiz(quizArray, itemId) {
+        currentView = "quiz";
+        itemList.innerHTML = "";
+        navTitle.textContent = "Exam Time!";
+        contentDisplay.classList.remove("hidden");
+        timerDisplay.classList.remove("hidden");
+
+        timeLeft = quizArray.length * 30; // 30 seconds per question
+        timerDisplay.textContent = formatTime(timeLeft);
+        contentDisplay.innerHTML = renderQuizContent(quizArray);
+        backButton.classList.remove("hidden");
+        selectedAnswers = new Array(quizArray.length).fill({ answer: null, locked: false }); // Initialize with lock status
+        startTimer();
+
+        startTime = Date.now(); // Set the start time here
+
+        history.pushState({ view: "quiz" }, "Quiz", "");
+
+        // Clear previously saved score for new attempt
+        localStorage.removeItem(`score-${itemId}`);
+    }
+
+    function renderQuizContent(quizArray) {
+        let htmlContent = `<div class="quiz-box"><div id="quizForm">`;
+
+        quizArray.forEach((question, index) => {
+            htmlContent += `
+                <div class="rounded-lg p-6 bg-white question mb-4">
+                    <h2 class="text-md font-bold mb-2">${question.question}</h2>
+                    <div class="options space-y-2">`;
+            question.options.forEach(option => {
+                htmlContent += `
+                    <button class="option w-full text-left p-2 rounded bg-gray-100" onclick="selectOption(this, '${question.correctAnswer}', ${index})">
+                        ${option}
+                    </button>`;
+            });
+            htmlContent += `
+                    </div>
+                </div>`;
+        });
+
+        htmlContent += `
+            <button type="button" class="w-full px-4 py-3 bg-indigo-600 text-white rounded" onclick="submitQuiz('${quizArray[0].id}')">Submit Answers</button>
+        </div>
+        </div>`;
+
+        return htmlContent;
+    }
+
+    function startTimer() {
+        timer = setInterval(() => {
+            timeLeft--;
+            timerDisplay.textContent = formatTime(timeLeft);
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                alert("Time's up! Submitting your answers.");
+                submitQuiz(); // Automatically submit if time's up
+            }
+        }, 1000);
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes}m ${secs}s`;
+    }
+
+    window.selectOption = function(button, correctAnswer, questionIndex) {
+        if (selectedAnswers[questionIndex].locked) return; // Prevent changing if locked
+
+        const questionDiv = button.closest('.question');
+        const selectedOption = questionDiv.querySelectorAll('.option');
+        selectedOption.forEach(option => {
+            option.classList.remove('selected');
+        });
+        button.classList.add('selected');
+        selectedAnswers[questionIndex] = { answer: button.textContent.trim(), locked: true }; // Lock the answer
+    };
+
+    window.submitQuiz = function(itemId) {
+        clearInterval(timer);
+        const endTime = Date.now();
+        const timeTaken = Math.floor((endTime - startTime) / 1000); // Time taken in seconds
+
+        const results = selectedAnswers.map((selected, index) => {
+            const question = items.flatMap(item => item.quiz)[index]; // Flatten quizzes to match selectedAnswers
+            return {
+                question: question.question,
+                selected: selected.answer,
+                correctAnswer: question.correctAnswer,
+            };
+        });
+
+        const correctCount = results.filter(result => result.selected === result.correctAnswer).length;
+        const incorrectCount = results.length - correctCount;
+
+        // Set marks based on correct and incorrect answers
+        const correctMark = 1;
+        const incorrectMark = 0.25;
+        const totalCorrectMarks = correctCount * correctMark;
+        const totalIncorrectMarks = incorrectCount * incorrectMark;
+        const totalMarks = totalCorrectMarks - totalIncorrectMarks;
+
+        const percentage = ((correctCount / results.length) * 100).toFixed(2); // Calculate percentage
+
+        // Save the score to localStorage
+        localStorage.setItem(`score-${itemId}`, totalMarks);
+
+        contentDisplay.innerHTML = `
+            <h2 class="text-2xl text-indigo-600 font-bold">Quiz Results</h2>
+            <div class="grid grid-cols-2 md:grid-cols-2 gap-4 mt-4">
+                <div class="bg-blue-100 p-4 rounded-lg "><h2 class="text-xl text-blue-600 font-bold">${results.length}</h2>Questions</div>
+                <div class="bg-green-100 p-4 rounded-lg"><h2 class="text-xl text-green-600 font-bold">${correctCount}</h2>Correct</div>
+                <div class="bg-red-100 p-4 rounded-lg "><h2 class="text-xl text-red-600 font-bold">${incorrectCount}</h2>Incorrect</div>
+                <div class="bg-yellow-100 p-4 rounded-lg"><h2 class="text-xl text-yellow-600 font-bold">${formatTime(timeTaken)}</h2>Time Taken</div>
+                <div class="bg-purple-100 p-4 rounded-lg"><h2 class="text-xl text-purple-600 font-bold">${percentage}%</h2>Score</div>
+                <div class="bg-pink-100 p-4 rounded-lg"><h2 class="text-xl text-pink-600 font-bold">${totalMarks.toFixed(2)}</h2>Total Marks</div>
+            </div>
+            <h3 class="mt-6 text-lg font-semibold text-gray-600">Review Your Answers:</h3>
+            <div class="mt-2 space-y-4">
+                ${results.map(result => `
+                    <div class="p-4 rounded-lg bg-white ">
+                        <p class="font-semibold">${result.question}</p>
+                        <p class="text-gray-700">Your Answer: ${result.selected || "No answer"}</p>
+                        <p class="text-gray-700">Correct Answer: ${result.correctAnswer}</p>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    };
+
+    window.onpopstate = function(event) {
+        if (event.state && event.state.view === "quiz") {
+            // Logic to handle back button when in quiz view
+            renderItems(items); // Go back to item list
+        }
+    };
+
+    backButton.addEventListener("click", function() {
+        if (currentView === "quiz") {
+            clearInterval(timer); // Clear timer when going back
+            renderItems(items);
+        }
+    });
+})();
+
+</script>
+</body>
+</html>
